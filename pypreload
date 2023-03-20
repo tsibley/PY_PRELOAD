@@ -1,0 +1,30 @@
+#!/bin/bash
+# usage: pypreload <code> <cmd> [<arg> [<arg> […]]]
+#
+# See <https://docs.python.org/3/library/site.html> for how the "sitecustomize"
+# module works.
+#
+set -euo pipefail
+
+code="$1"
+shift
+
+tmplib="$(mktemp -dt "$(basename "$0")"-XXXXXX)"
+
+cat > "$tmplib/sitecustomize.py" <<~~
+# written by $0 to run: $*
+$code
+
+# remove ourselves from consideration
+import sys, os.path
+del sys.modules["sitecustomize"]
+sys.path.remove(os.path.dirname(__file__))
+
+# import any sitecustomize we masked
+import sitecustomize
+~~
+
+PYTHONPATH="$tmplib${PYTHONPATH:+:}${PYTHONPATH:-}"
+export PYTHONPATH
+
+exec "$@"
